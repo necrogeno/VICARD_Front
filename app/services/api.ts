@@ -1,23 +1,38 @@
+require('dotenv').config();
 // services/api.ts
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
-export async function getBackendData(endpoint: string) {
-  try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      // cache: 'no-store' // Opcional: para datos que cambian constantemente
-    });
+// 1. Configuración base
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
-    if (!response.ok) {
-      throw new Error(`Error en la petición: ${response.status}`);
-    }
+// 2. Función base genérica (el "motor" del servicio)
+async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const response = await fetch(`${BASE_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-    return await response.json();
-  } catch (error) {
-    console.error("Error al conectar con el backend:", error);
-    throw error;
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(errorBody.message || `Error HTTP: ${response.status}`);
   }
+
+  return response.json();
 }
+
+// 3. Funciones específicas exportables
+export const ItemService = {
+  // Obtener todos los elementos
+  getAll: () => apiFetch<any[]>('/find'),
+  
+  // Obtener uno solo por ID
+  getById: (id: string) => apiFetch<any>(`/find/${id}`),
+  
+  // Crear uno nuevo (POST)
+  create: (data: any) => apiFetch('/add', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+};
