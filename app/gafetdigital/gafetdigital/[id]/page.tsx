@@ -1,7 +1,9 @@
 import React from 'react';
 import { Mail, Phone, MapPin, Briefcase } from 'lucide-react';
+import { GafetService } from '@/app/services/api';
+import { notFound } from 'next/navigation';
 
-// 1. Definimos la estructura de los datos
+// 1. Mantén la estructura limpia de tu interfaz de UI
 interface PersonaProps {
   nombre: string;
   apellidos: string;
@@ -14,7 +16,7 @@ interface PersonaProps {
   fotoUrl?: string;
 }
 
-// 2. Componente de la Tarjeta
+// 2. Componente de la Tarjeta (Se queda exactamente igual)
 const ProfileCard = ({ persona }: { persona: PersonaProps }) => {
   const { 
     nombre, 
@@ -29,9 +31,8 @@ const ProfileCard = ({ persona }: { persona: PersonaProps }) => {
   } = persona;
 
   return (
-    <div className="max-w-md w-full bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden transition-all hover:shadow-md">
-      {/* Header con Imagen y Estado */}
-      <div className="relative h-32 bg-blue-500 flex items-end justify-center">
+    <div className="lg:max-w-md w-full bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden transition-all">
+      <div className="relative h-32 bg-blue-500 flex md:items-end justify-center">
         <div className="absolute -bottom-12">
           <div className="relative">
             <img 
@@ -39,13 +40,11 @@ const ProfileCard = ({ persona }: { persona: PersonaProps }) => {
               alt={`${nombre} ${apellidos}`}
               className="w-24 h-24 rounded-full border-4 border-white object-cover bg-gray-200"
             />
-            {/* Indicador de Activo/Inactivo */}
             <span className={`absolute bottom-1 right-1 w-5 h-5 border-4 border-white rounded-full ${estaActivo ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
           </div>
         </div>
       </div>
 
-      {/* Información Principal */}
       <div className="pt-14 pb-8 px-6 text-center">
         <h2 className="text-xl font-bold text-slate-900 leading-tight">
           {nombre} {apellidos}
@@ -61,7 +60,6 @@ const ProfileCard = ({ persona }: { persona: PersonaProps }) => {
 
         <hr className="my-6 border-slate-100" />
 
-        {/* Detalles de Contacto */}
         <div className="space-y-4 text-left text-sm text-slate-600">
           <div className="flex items-start gap-3">
             <Phone size={18} className="text-slate-400 shrink-0" />
@@ -82,29 +80,44 @@ const ProfileCard = ({ persona }: { persona: PersonaProps }) => {
           </div>
         </div>
       </div>
-
     </div>
   );
 };
 
-// 3. Página Principal (Aquí agregamos datos de ejemplo para que lo veas funcionando)
-export default function Home() {
-  const datosPersona = {
-    nombre: "Carlos",
-    apellidos: "Mendoza Ortiz",
-    puesto: "Desarrollador Front-End",
-    direccion: "Av. de la Juventud #4105",
-    telefono: "+52 (614) 123-4567",
-    email: "carlos.mendoza@email.com",
-    colonia: "Col. San Felipe",
-    estaActivo: true,
-    // Puedes dejarlo vacío para usar la foto de prueba o poner un link a una imagen real
-    fotoUrl: "" 
-  };
+interface Props {
+  params: Promise<{ id: string }>;
+}
 
-  return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50 p-4">
-      <ProfileCard persona={datosPersona} />
-    </div>
-  );
+// 3. Página Principal Asíncrona
+export default async function Home({ params }: Props) {
+  const { id } = await params;
+
+  try {
+    // Obtenemos el objeto crudo (any) desde el backend
+    const backendData: any = await GafetService.getById(id);
+
+    // Mapeamos las propiedades en español/mayúsculas a nuestro formato de interfaz
+    const datosPersona: PersonaProps = {
+      nombre: backendData.Nombres,
+      apellidos: `${backendData.PrimerApellido} ${backendData.SegundoApellido}`.trim(),
+      puesto: backendData.Puesto,
+      direccion: `${backendData.Direccion} ${backendData.NumeroExterior}`,
+      telefono: backendData.Telefono,
+      email: backendData.email, // Este sí funcionaba porque venía en minúsculas en el JSON
+      colonia: backendData.Colonia,
+      estaActivo: backendData.Activo,
+      fotoUrl: backendData.Foto 
+        ? `${process.env.NEXT_PUBLIC_API_URL}${backendData.Foto}` 
+        : undefined
+    };
+
+    return (
+      <div className="flex lg:items-center justify-center min-h-screen bg-gray-50 p-4">
+        <ProfileCard persona={datosPersona} />
+      </div>
+    );
+  } catch (error) {
+    console.error("Error al obtener los datos del gafet:", error);
+    notFound(); 
+  }
 }
