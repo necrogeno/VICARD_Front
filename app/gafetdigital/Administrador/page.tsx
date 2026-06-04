@@ -273,12 +273,11 @@ export default function AdminDashboard() {
                     className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-gray-300 transition-all bg-white"
                   />
                 </div>
-                <button 
-                  onClick={handleOpenAddModal}
+                < a href="/gafetdigital/Administrador/Crear"
                   className={`w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium transition-colors shadow-sm ${currentTheme.bg} ${currentTheme.hover}`}
                 >
                   <Plus size={16} /> Agregar Usuario
-                </button>
+                </a>
               </div>
 
               {isLoading ? (

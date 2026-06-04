@@ -1,13 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation'; // Para leer el [id] de la URL
+import React, { useState } from 'react';
 import { GafetService } from '../../../services/api'; // Ajusta la ruta según tu estructura de carpetas
 
 export default function EmpleadoForm() {
-  const params = useParams();
-  const id = params?.id as string; // Extrae el ID dinámico de la URL
-
   const [formData, setFormData] = useState({
     idEmpleado: '',
     nombres: '',
@@ -31,59 +27,6 @@ export default function EmpleadoForm() {
   });
 
   const [foto, setFoto] = useState<File | null>(null);
-  const [currentFotoUrl, setCurrentFotoUrl] = useState<string>(''); // Para mostrar la foto existente
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // 1. Cargar los datos desde el servicio usando el ID de la URL
-  useEffect(() => {
-    if (!id) return;
-
-    const fetchEmpleado = async () => {
-      try {
-        setLoading(true);
-        // Llamada al método getById de tu GafetService
-        const jsonDeMongoDB = await GafetService.getById(id);
-
-        if (jsonDeMongoDB) {
-          // Mapeamos las claves del JSON (PascalCase) al estado local (camelCase)
-          setFormData({
-            idEmpleado: jsonDeMongoDB.IdEmpleado || '',
-            nombres: jsonDeMongoDB.Nombres || '',
-            primerApellido: jsonDeMongoDB.PrimerApellido || '',
-            segundoApellido: jsonDeMongoDB.SegundoApellido || '',
-            puesto: jsonDeMongoDB.Puesto || '',
-            telefono: jsonDeMongoDB.Telefono || '',
-            extension: jsonDeMongoDB.Extension || '',
-            email: jsonDeMongoDB.email || '', // En tu JSON viene en minúscula
-            centroTrabajo: jsonDeMongoDB.CentroTrabajo || '',
-            unidadAdministrativa: jsonDeMongoDB.UnidadAdministrativa || '',
-            direccion: jsonDeMongoDB.Direccion || '',
-            numeroExterior: jsonDeMongoDB.NumeroExterior || '',
-            numeroInterior: jsonDeMongoDB.NumeroInterior || '',
-            colonia: jsonDeMongoDB.Colonia || '',
-            codigoPostal: jsonDeMongoDB.CodigoPostal || '',
-            ciudad: jsonDeMongoDB.Ciudad || '',
-            municipio: jsonDeMongoDB.Municipio || '',
-            pais: jsonDeMongoDB.Pais || 'México',
-            activo: jsonDeMongoDB.Activo ?? true,
-          });
-
-          // Guardamos la URL de la foto actual si existe
-          if (jsonDeMongoDB.Foto) {
-            setCurrentFotoUrl(jsonDeMongoDB.Foto);
-          }
-        }
-      } catch (err: any) {
-        console.error("Error al cargar el empleado:", err);
-        setError(err.message || "No se pudo cargar la información del empleado.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchEmpleado();
-  }, [id]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -101,12 +44,12 @@ export default function EmpleadoForm() {
     }
   };
 
-  // 2. Guardar los datos usando el método create (POST) del servicio
+  // Guardar los datos usando el método create (POST) del servicio
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
-      // Reconstruimos el JSON mapeando de regreso a PascalCase para que coincida con tu backend
+      // Reconstruimos el JSON mapeando de camelCase a PascalCase para tu backend
       const dbPayload = {
         IdEmpleado: formData.idEmpleado,
         Nombres: formData.nombres,
@@ -127,36 +70,50 @@ export default function EmpleadoForm() {
         Municipio: formData.municipio,
         Pais: formData.pais,
         Activo: formData.activo,
-        // Si no se sube una foto nueva, conserva la ruta de la foto anterior
-        Foto: currentFotoUrl 
+        Foto: '' // Al ser un registro nuevo, inicia vacío o se maneja en el backend
       };
 
-      // NOTA: Tu `apiFetch` actual en la imagen envía un 'application/json'. 
-      // Si tu backend en Flask recibe un JSON plano, usamos `GafetService.create`:
-      console.log("Enviando datos al servicio:", dbPayload);
+      console.log("Enviando nuevo registro al servicio:", dbPayload);
       const response = await GafetService.create(dbPayload);
       
-      alert("Empleado guardado con éxito");
+      alert("Empleado registrado con éxito");
       console.log("Respuesta del servidor:", response);
 
-      /* IMPORTANTE: Si ocupas subir la FOTO como archivo binario real, 
-        deberás cambiar el Content-Type en tu api.ts a multipart/form-data 
-        y pasar un objeto FormData() en lugar de JSON.stringify.
-      */
+      // Opcional: Limpiar el formulario tras un envío exitoso
+      setFormData({
+        idEmpleado: '',
+        nombres: '',
+        primerApellido: '',
+        segundoApellido: '',
+        puesto: '',
+        telefono: '',
+        extension: '',
+        email: '',
+        centroTrabajo: '',
+        unidadAdministrativa: '',
+        direccion: '',
+        numeroExterior: '',
+        numeroInterior: '',
+        colonia: '',
+        codigoPostal: '',
+        ciudad: '',
+        municipio: '',
+        pais: 'México',
+        activo: true,
+      });
+      setFoto(null);
+
     } catch (err: any) {
       console.error("Error al guardar:", err);
       alert(`Error al guardar: ${err.message}`);
     }
   };
 
-  if (loading) return <div className="text-center my-10 text-sm text-neutral-500">Cargando datos del personal...</div>;
-  if (error) return <div className="text-center my-10 text-sm text-red-500">{error}</div>;
-
   return (
     <div className="max-w-4xl mx-auto my-10 p-8 bg-white border border-neutral-200 rounded-lg shadow-sm font-sans">
       <header className="mb-8 border-b border-neutral-100 pb-4">
         <h1 className="text-xl font-semibold text-neutral-800 tracking-tight">Registro de Personal</h1>
-        <p className="text-xs text-neutral-500 mt-1">Modifique o ingrese los datos oficiales para el alta en el sistema.</p>
+        <p className="text-xs text-neutral-500 mt-1">Ingrese los datos oficiales para el alta en el sistema.</p>
       </header>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -184,9 +141,6 @@ export default function EmpleadoForm() {
             <div>
               <label className="block text-xs font-medium text-neutral-600 mb-1">Fotografía del Personal</label>
               <input type="file" accept="image/*" onChange={handleFileChange} className="w-full text-xs text-neutral-500 file:mr-4 file:py-2 file:px-3 file:rounded file:border-0 file:text-xs file:font-medium file:bg-neutral-100 file:text-neutral-700 hover:file:bg-neutral-200 cursor-pointer" />
-              {currentFotoUrl && !foto && (
-                <p className="text-[10px] text-neutral-400 mt-1 truncate">Foto actual: {currentFotoUrl}</p>
-              )}
             </div>
           </div>
         </div>
@@ -270,7 +224,7 @@ export default function EmpleadoForm() {
         {/* Botón de Envío */}
         <div className="pt-4 flex justify-end">
           <button type="submit" className="px-6 py-2 bg-neutral-950 text-white text-sm font-medium rounded hover:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-neutral-950 transition-colors shadow-sm">
-            Guardar Cambios
+            Crear Gafet
           </button>
         </div>
 
