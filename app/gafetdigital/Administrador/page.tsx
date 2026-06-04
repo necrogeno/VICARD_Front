@@ -15,11 +15,11 @@ import {
 } from "lucide-react";
 import { GafetService } from "../../services/api"; 
 
-// --- INTERFAZ DE TYPESCRIPT CORREGIDA (Acoplada a tu MongoDB JSON) ---
+// --- INTERFAZ DE TYPESCRIPT CORREGIDA ---
 interface User {
   _id?: string;
-  id?: string; // Mantenemos por compatibilidad si es necesario
-  Activo: boolean; // Cambiado a booleano según tu base de datos
+  id?: string; 
+  Activo: boolean; 
   CentroTrabajo?: string;
   Ciudad?: string;
   CodigoPostal?: string;
@@ -29,14 +29,14 @@ interface User {
   Foto?: string;
   IdEmpleado?: string;
   Municipio?: string;
-  Nombres: string; // Cambiado (antes era 'name')
+  Nombres: string; 
   NumeroExterior?: string;
   NumeroInterior?: string;
   Pais?: string;
-  PrimerApellido?: string; // Agregado
-  SegundoApellido?: string; // Agregado
+  PrimerApellido?: string; 
+  SegundoApellido?: string; 
   Puesto: string;
-  Telefono?: string; // Cambiado a T mayúscula (antes era 'telefono')
+  Telefono?: string; 
   UnidadAdministrativa?: string;
   email: string;
 }
@@ -47,11 +47,9 @@ export default function AdminDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [themeColor, setThemeColor] = useState<"blue" | "emerald" | "violet">("blue");
 
-  // Estado de Usuarios e indicador de carga
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Estado para el formulario de usuario (Agregar / Editar)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [formData, setFormData] = useState({ 
@@ -64,7 +62,7 @@ export default function AdminDashboard() {
     Activo: true 
   });
 
-  // --- EFECTO: CARGAR DATOS DESDE LA API ---
+  // --- EFECTO: CARGAR DATOS ---
   const fetchUsers = async () => {
     try {
       setIsLoading(true);
@@ -91,7 +89,7 @@ export default function AdminDashboard() {
 
   const currentTheme = themeClasses[themeColor];
 
-  // --- LÓGICA DE FILTRADO CORREGIDA (Busca sobre el nombre completo real) ---
+  // --- LÓGICA DE FILTRADO CORREGIDA (Incluye Teléfono) ---
   const filteredUsers = useMemo(() => {
     return users.filter(user => {
       const nombreCompleto = `${user.Nombres || ''} ${user.PrimerApellido || ''} ${user.SegundoApellido || ''}`.toLowerCase();
@@ -100,7 +98,8 @@ export default function AdminDashboard() {
       return (
         nombreCompleto.includes(query) ||
         user.email?.toLowerCase().includes(query) ||
-        user.Puesto?.toLowerCase().includes(query)
+        user.Puesto?.toLowerCase().includes(query) ||
+        user.Telefono?.toLowerCase().includes(query) // <-- SOLUCIÓN AL BUSCADOR POR TELÉFONO
       );
     });
   }, [users, searchQuery]);
@@ -126,7 +125,6 @@ export default function AdminDashboard() {
     setIsModalOpen(true);
   };
 
-  // --- PERSISTENCIA CON EL SERVICIO ---
   const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -135,7 +133,6 @@ export default function AdminDashboard() {
       } else {
         await GafetService.create(formData);
       }
-      
       setIsModalOpen(false);
       fetchUsers(); 
     } catch (error) {
@@ -195,7 +192,6 @@ export default function AdminDashboard() {
             </button>
           </nav>
         </div>
-        
         <div className="p-4 border-t border-gray-100 text-xs text-gray-400 text-center">
           v1.0.0 — Conectado a Producción
         </div>
@@ -203,8 +199,6 @@ export default function AdminDashboard() {
 
       {/* CONTENIDO PRINCIPAL */}
       <main className="flex-1 flex flex-col overflow-y-auto">
-        
-        {/* TOPBAR */}
         <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-8 sticky top-0 z-10">
           <h1 className="text-xl font-semibold capitalize text-gray-900">{activeTab}</h1>
           <div className="flex items-center gap-4">
@@ -218,10 +212,9 @@ export default function AdminDashboard() {
           </div>
         </header>
 
-        {/* CONTENEDOR DE VISTAS */}
         <div className="p-2 max-w-7xl w-full mx-auto space-y-6">
           
-          {/* 1. SECCIÓN: DASHBOARD */}
+          {/* DASHBOARD */}
           {activeTab === "dashboard" && (
             <div className="space-y-6 animate-fadeIn">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -234,7 +227,6 @@ export default function AdminDashboard() {
                     <Users size={24} />
                   </div>
                 </div>
-
                 <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-400 uppercase tracking-wider">Usuarios Activos</p>
@@ -246,7 +238,6 @@ export default function AdminDashboard() {
                     <UserCheck size={24} />
                   </div>
                 </div>
-
                 <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-400 uppercase tracking-wider">Usuarios Inactivos</p>
@@ -259,7 +250,6 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </div>
-
               <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
                 <h3 className="text-lg font-semibold mb-4">Rendimiento de la Plataforma</h3>
                 <div className="h-64 bg-gray-50 rounded-xl border border-dashed border-gray-200 flex items-center justify-center text-gray-400 text-sm">
@@ -269,22 +259,20 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* 2. SECCIÓN: GESTIÓN DE USUARIOS */}
+          {/* GESTIÓN DE USUARIOS */}
           {activeTab === "users" && (
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden animate-fadeIn">
-              
               <div className="p-6 border-b border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4 bg-gray-50/50">
                 <div className="relative w-full sm:w-72">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                   <input 
                     type="text" 
-                    placeholder="Buscar usuario..."
+                    placeholder="Buscar por nombre, correo, puesto o tel..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-gray-300 transition-all bg-white"
                   />
                 </div>
-                
                 <button 
                   onClick={handleOpenAddModal}
                   className={`w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium transition-colors shadow-sm ${currentTheme.bg} ${currentTheme.hover}`}
@@ -293,7 +281,6 @@ export default function AdminDashboard() {
                 </button>
               </div>
 
-              {/* Loader de carga */}
               {isLoading ? (
                 <div className="py-20 text-center text-gray-500 text-sm">
                   Cargando registros desde la base de datos...
@@ -315,8 +302,6 @@ export default function AdminDashboard() {
                       {filteredUsers.length > 0 ? (
                         filteredUsers.map((user) => {
                           const currentId = user._id || user.id || "";
-                          
-                          // Combinación estructurada del Nombre Completo real
                           const nombreCompleto = `${user.Nombres || ''} ${user.PrimerApellido || ''} ${user.SegundoApellido || ''}`.trim();
 
                           return (
@@ -325,10 +310,16 @@ export default function AdminDashboard() {
                                 <a href={`/gafetdigital/Administrador/${currentId}`}>{nombreCompleto || "Sin Nombre"}</a>
                               </td>
                               <td className="px-6 py-4 text-gray-500">
-                                <a href={`/gafetdigital/Administrador/${currentId}`}>{user.email}</a>
+                                {/* Ajustado a un ancho máximo menor (max-w-[130px]) */}
+                                <a 
+                                  href={`/gafetdigital/Administrador/${currentId}`} 
+                                  className="max-w-[130px] truncate block text-blue-600 hover:underline" 
+                                  title={user.email}
+                                >
+                                  {user.email}
+                                </a>
                               </td>
                               <td className="px-6 py-4 text-gray-600">
-                                {/* Corregido propiedad 'Telefono' */}
                                 <a href={`/gafetdigital/Administrador/${currentId}`}>{user.Telefono || "—"}</a>
                               </td>
                               <td className="px-6 py-4 text-gray-600"> 
@@ -339,7 +330,6 @@ export default function AdminDashboard() {
                                 </a>
                               </td>
                               <td className="px-6 py-4">
-                                {/* Corregido el Badge condicional con el Booleano 'Activo' */}
                                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${
                                   user.Activo ? "bg-emerald-50 text-emerald-700" : "bg-red-100 text-red-600"
                                 }`}>
@@ -369,7 +359,7 @@ export default function AdminDashboard() {
                       ) : (
                         <tr>
                           <td colSpan={6} className="px-6 py-12 text-center text-gray-400">
-                            No se encontraron usuarios en el servidor.
+                            No se encontraron usuarios coincidentes.
                           </td>
                         </tr>
                       )}
@@ -380,7 +370,7 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* 3. SECCIÓN: CONFIGURACIÓN */}
+          {/* CONFIGURACIÓN */}
           {activeTab === "settings" && (
             <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm max-w-2xl animate-fadeIn space-y-6">
               <div>
@@ -408,11 +398,10 @@ export default function AdminDashboard() {
               </div>
             </div>
           )}
-
         </div>
       </main>
 
-      {/* --- MODAL PARA AGREGAR / EDITAR USUARIOS --- */}
+      {/* MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
           <div className="bg-white rounded-2xl border border-gray-200 max-w-md w-full shadow-xl overflow-hidden transform transition-all">
