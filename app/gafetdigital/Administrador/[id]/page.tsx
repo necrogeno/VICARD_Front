@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation'; // Para leer el [id] de la URL
+import { useParams, useRouter } from 'next/navigation';
 import { GafetService } from '../../../services/api'; // Ajusta la ruta según tu estructura de carpetas
 
 export default function EmpleadoForm() {
   const params = useParams();
-  const id = params?.id as string; // Extrae el ID dinámico de la URL
+  const router = useRouter();
+  const id = params?.id as string;
 
   const [formData, setFormData] = useState({
     idEmpleado: '',
@@ -31,22 +32,27 @@ export default function EmpleadoForm() {
   });
 
   const [foto, setFoto] = useState<File | null>(null);
-  const [currentFotoUrl, setCurrentFotoUrl] = useState<string>(''); // Para mostrar la foto existente
+  const [currentFotoUrl, setCurrentFotoUrl] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 1. Cargar los datos desde el servicio usando el ID de la URL
+  // Estado para capturar los errores de validación por campo
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // 1. Cargar los datos desde el servicio
   useEffect(() => {
-    if (!id) return;
+    if (!id) {
+      setError("No se proporcionó un ID de usuario válido.");
+      setLoading(false);
+      return;
+    }
 
     const fetchEmpleado = async () => {
       try {
         setLoading(true);
-        // Llamada al método getById de tu GafetService
         const jsonDeMongoDB = await GafetService.getById(id);
 
         if (jsonDeMongoDB) {
-          // Mapeamos las claves del JSON (PascalCase) al estado local (camelCase)
           setFormData({
             idEmpleado: jsonDeMongoDB.IdEmpleado || '',
             nombres: jsonDeMongoDB.Nombres || '',
@@ -55,7 +61,7 @@ export default function EmpleadoForm() {
             puesto: jsonDeMongoDB.Puesto || '',
             telefono: jsonDeMongoDB.Telefono || '',
             extension: jsonDeMongoDB.Extension || '',
-            email: jsonDeMongoDB.email || '', // En tu JSON viene en minúscula
+            email: jsonDeMongoDB.email || '',
             centroTrabajo: jsonDeMongoDB.CentroTrabajo || '',
             unidadAdministrativa: jsonDeMongoDB.UnidadAdministrativa || '',
             direccion: jsonDeMongoDB.Direccion || '',
@@ -69,7 +75,6 @@ export default function EmpleadoForm() {
             activo: jsonDeMongoDB.Activo ?? true,
           });
 
-          // Guardamos la URL de la foto actual si existe
           if (jsonDeMongoDB.Foto) {
             setCurrentFotoUrl(jsonDeMongoDB.Foto);
           }
@@ -87,6 +92,16 @@ export default function EmpleadoForm() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
+    
+    // Limpiamos el error del campo que el usuario está editando actualmente
+    if (errors[name]) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
+    }
+
     if (type === 'checkbox') {
       const checked = (e.target as HTMLInputElement).checked;
       setFormData((prev) => ({ ...prev, [name]: checked }));
@@ -101,12 +116,79 @@ export default function EmpleadoForm() {
     }
   };
 
-  // 2. Guardar los datos usando el método create (POST) del servicio
+  // Función de validación de negocio
+  const validateForm = () => {
+    const localErrors: Record<string, string> = {};
+    
+    // Expresiones regulares básicas
+    const regexSoloNumeros = /^[0-9]+$/;
+    // Permite letras, espacios, acentos y la Ñ
+    const regexSoloLetras = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/;
+    // Validación estándar de email
+    const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    // 1. Validar Campos Numéricos
+    if (formData.extension && !regexSoloNumeros.test(formData.extension)) {
+      localErrors.extension = "La extensión debe contener solo números.";
+    }
+    if (formData.numeroExterior && !regexSoloNumeros.test(formData.numeroExterior)) {
+      localErrors.numeroExterior = "El número exterior debe contener solo números.";
+    }
+    if (formData.numeroInterior && formData.numeroInterior !== 'N/A' && formData.numeroInterior.trim() !== '' && !regexSoloNumeros.test(formData.numeroInterior)) {
+      localErrors.numeroInterior = "El número interior debe contener solo números o 'N/A'.";
+    }
+    if (formData.codigoPostal && !regexSoloNumeros.test(formData.codigoPostal)) {
+      localErrors.codigoPostal = "El código postal debe contener solo números.";
+    }
+
+    // 2. Validar Campos de Texto (Solo Letras)
+    if (formData.nombres && !regexSoloLetras.test(formData.nombres)) {
+      localErrors.nombres = "El nombre solo debe contener letras.";
+    }
+    if (formData.primerApellido && !regexSoloLetras.test(formData.primerApellido)) {
+      localErrors.primerApellido = "El primer apellido solo debe contener letras.";
+    }
+    if (formData.segundoApellido && !regexSoloLetras.test(formData.segundoApellido)) {
+      localErrors.segundoApellido = "El segundo apellido solo debe contener letras.";
+    }
+    if (formData.unidadAdministrativa && !regexSoloLetras.test(formData.unidadAdministrativa)) {
+      localErrors.unidadAdministrativa = "La unidad administrativa solo debe contener letras.";
+    }
+    if (formData.colonia && !regexSoloLetras.test(formData.colonia)) {
+      localErrors.colonia = "La colonia solo debe contener letras.";
+    }
+    if (formData.ciudad && !regexSoloLetras.test(formData.ciudad)) {
+      localErrors.ciudad = "La ciudad solo debe contener letras.";
+    }
+    if (formData.municipio && !regexSoloLetras.test(formData.municipio)) {
+      localErrors.municipio = "El municipio solo debe contener letras.";
+    }
+
+    // 3. Validar Correo Electrónico
+    if (formData.email && !regexEmail.test(formData.email)) {
+      localErrors.email = "Por favor, introduce un correo electrónico válido (ejemplo@gob.mx).";
+    }
+
+    setErrors(localErrors);
+    return Object.keys(localErrors).length === 0; // Devuelve true si no hay errores
+  };
+
+  // 2. Guardar los datos editados
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!id) {
+      alert("Error: No se puede actualizar un registro sin un ID válido.");
+      return;
+    }
+
+    // Ejecutar validaciones locales antes de enviar
+    if (!validateForm()) {
+      alert("Por favor, corrige los campos marcados en rojo antes de continuar.");
+      return;
+    }
     
     try {
-      // Reconstruimos el JSON mapeando de regreso a PascalCase para que coincida con tu backend
       const dbPayload = {
         IdEmpleado: formData.idEmpleado,
         Nombres: formData.nombres,
@@ -127,36 +209,41 @@ export default function EmpleadoForm() {
         Municipio: formData.municipio,
         Pais: formData.pais,
         Activo: formData.activo,
-        // Si no se sube una foto nueva, conserva la ruta de la foto anterior
         Foto: currentFotoUrl 
       };
 
-      // NOTA: Tu `apiFetch` actual en la imagen envía un 'application/json'. 
-      // Si tu backend en Flask recibe un JSON plano, usamos `GafetService.create`:
-      console.log("Enviando datos al servicio:", dbPayload);
-      const response = await GafetService.create(dbPayload);
+      console.log(`Actualizando registro con ID: ${id}`, dbPayload);
       
-      alert("Empleado guardado con éxito");
+      const response = await GafetService.update(id, dbPayload);
+      
+      alert("Información del personal actualizada con éxito.");
       console.log("Respuesta del servidor:", response);
 
-      /* IMPORTANTE: Si ocupas subir la FOTO como archivo binario real, 
-        deberás cambiar el Content-Type en tu api.ts a multipart/form-data 
-        y pasar un objeto FormData() en lugar de JSON.stringify.
-      */
+      router.push('/gafetdigital/Administrador');
+
     } catch (err: any) {
-      console.error("Error al guardar:", err);
-      alert(`Error al guardar: ${err.message}`);
+      console.error("Error al actualizar:", err);
+      alert(`Error al actualizar: ${err.message}`);
     }
   };
 
   if (loading) return <div className="text-center my-10 text-sm text-neutral-500">Cargando datos del personal...</div>;
   if (error) return <div className="text-center my-10 text-sm text-red-500">{error}</div>;
 
+  // Función utilitaria para aplicar clases dinámicas de Tailwind según el estado de error
+  const getInputClass = (fieldName: string) => {
+    const baseClass = "w-full text-sm px-3 py-2 border rounded focus:outline-none transition-colors";
+    if (errors[fieldName]) {
+      return `${baseClass} border-red-500 focus:border-red-600 bg-red-50/30 text-red-900`;
+    }
+    return `${baseClass} border-neutral-300 focus:border-neutral-900`;
+  };
+
   return (
     <div className="max-w-4xl mx-auto my-10 p-8 bg-white border border-neutral-200 rounded-lg shadow-sm font-sans">
       <header className="mb-8 border-b border-neutral-100 pb-4">
-        <h1 className="text-xl font-semibold text-neutral-800 tracking-tight">Registro de Personal</h1>
-        <p className="text-xs text-neutral-500 mt-1">Modifique o ingrese los datos oficiales para el alta en el sistema.</p>
+        <h1 className="text-xl font-semibold text-neutral-800 tracking-tight">Modificar Registro de Personal</h1>
+        <p className="text-xs text-neutral-500 mt-1">Actualice los datos oficiales del miembro en el sistema.</p>
       </header>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -167,19 +254,22 @@ export default function EmpleadoForm() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-medium text-neutral-600 mb-1">ID Empleado</label>
-              <input type="text" name="idEmpleado" value={formData.idEmpleado} onChange={handleChange} placeholder="N/A o Número" className="w-full text-sm px-3 py-2 border border-neutral-300 rounded focus:outline-none focus:border-neutral-900 transition-colors" />
+              <input type="text" name="idEmpleado" value={formData.idEmpleado} onChange={handleChange} placeholder="N/A o Número" className={getInputClass('idEmpleado')} />
             </div>
             <div className="md:col-span-2">
               <label className="block text-xs font-medium text-neutral-600 mb-1">Nombre(s) *</label>
-              <input type="text" name="nombres" value={formData.nombres} onChange={handleChange} required className="w-full text-sm px-3 py-2 border border-neutral-300 rounded focus:outline-none focus:border-neutral-900 transition-colors" />
+              <input type="text" name="nombres" value={formData.nombres} onChange={handleChange} required className={getInputClass('nombres')} />
+              {errors.nombres && <p className="text-[11px] text-red-500 mt-0.5">{errors.nombres}</p>}
             </div>
             <div>
               <label className="block text-xs font-medium text-neutral-600 mb-1">Primer Apellido *</label>
-              <input type="text" name="primerApellido" value={formData.primerApellido} onChange={handleChange} required className="w-full text-sm px-3 py-2 border border-neutral-300 rounded focus:outline-none focus:border-neutral-900 transition-colors" />
+              <input type="text" name="primerApellido" value={formData.primerApellido} onChange={handleChange} required className={getInputClass('primerApellido')} />
+              {errors.primerApellido && <p className="text-[11px] text-red-500 mt-0.5">{errors.primerApellido}</p>}
             </div>
             <div>
               <label className="block text-xs font-medium text-neutral-600 mb-1">Segundo Apellido</label>
-              <input type="text" name="segundoApellido" value={formData.segundoApellido} onChange={handleChange} className="w-full text-sm px-3 py-2 border border-neutral-300 rounded focus:outline-none focus:border-neutral-900 transition-colors" />
+              <input type="text" name="segundoApellido" value={formData.segundoApellido} onChange={handleChange} className={getInputClass('segundoApellido')} />
+              {errors.segundoApellido && <p className="text-[11px] text-red-500 mt-0.5">{errors.segundoApellido}</p>}
             </div>
             <div>
               <label className="block text-xs font-medium text-neutral-600 mb-1">Fotografía del Personal</label>
@@ -199,19 +289,21 @@ export default function EmpleadoForm() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="md:col-span-2">
               <label className="block text-xs font-medium text-neutral-600 mb-1">Puesto *</label>
-              <input type="text" name="puesto" value={formData.puesto} onChange={handleChange} required className="w-full text-sm px-3 py-2 border border-neutral-300 rounded focus:outline-none focus:border-neutral-900 transition-colors" />
+              <input type="text" name="puesto" value={formData.puesto} onChange={handleChange} required className={getInputClass('puesto')} />
             </div>
             <div>
               <label className="block text-xs font-medium text-neutral-600 mb-1">Correo Electrónico *</label>
-              <input type="email" name="email" value={formData.email} onChange={handleChange} required placeholder="ejemplo@gob.mx" className="w-full text-sm px-3 py-2 border border-neutral-300 rounded focus:outline-none focus:border-neutral-900 transition-colors" />
+              <input type="email" name="email" value={formData.email} onChange={handleChange} required placeholder="ejemplo@gob.mx" className={getInputClass('email')} />
+              {errors.email && <p className="text-[11px] text-red-500 mt-0.5">{errors.email}</p>}
             </div>
             <div>
               <label className="block text-xs font-medium text-neutral-600 mb-1">Teléfono *</label>
-              <input type="tel" name="telefono" value={formData.telefono} onChange={handleChange} required placeholder="(614)-000-0000" className="w-full text-sm px-3 py-2 border border-neutral-300 rounded focus:outline-none focus:border-neutral-900 transition-colors" />
+              <input type="tel" name="telefono" value={formData.telefono} onChange={handleChange} required placeholder="(614)-000-0000" className={getInputClass('telefono')} />
             </div>
             <div>
               <label className="block text-xs font-medium text-neutral-600 mb-1">Extensión</label>
-              <input type="text" name="extension" value={formData.extension} onChange={handleChange} className="w-full text-sm px-3 py-2 border border-neutral-300 rounded focus:outline-none focus:border-neutral-900 transition-colors" />
+              <input type="text" name="extension" value={formData.extension} onChange={handleChange} className={getInputClass('extension')} />
+              {errors.extension && <p className="text-[11px] text-red-500 mt-0.5">{errors.extension}</p>}
             </div>
             <div className="flex items-end pb-2">
               <label className="inline-flex items-center cursor-pointer select-none">
@@ -221,11 +313,12 @@ export default function EmpleadoForm() {
             </div>
             <div className="md:col-span-2">
               <label className="block text-xs font-medium text-neutral-600 mb-1">Centro de Trabajo *</label>
-              <input type="text" name="centroTrabajo" value={formData.centroTrabajo} onChange={handleChange} required className="w-full text-sm px-3 py-2 border border-neutral-300 rounded focus:outline-none focus:border-neutral-900 transition-colors" />
+              <input type="text" name="centroTrabajo" value={formData.centroTrabajo} onChange={handleChange} required className={getInputClass('centroTrabajo')} />
             </div>
             <div className="md:col-span-1">
               <label className="block text-xs font-medium text-neutral-600 mb-1">Unidad Administrativa *</label>
-              <input type="text" name="unidadAdministrativa" value={formData.unidadAdministrativa} onChange={handleChange} required className="w-full text-sm px-3 py-2 border border-neutral-300 rounded focus:outline-none focus:border-neutral-900 transition-colors" />
+              <input type="text" name="unidadAdministrativa" value={formData.unidadAdministrativa} onChange={handleChange} required className={getInputClass('unidadAdministrativa')} />
+              {errors.unidadAdministrativa && <p className="text-[11px] text-red-500 mt-0.5">{errors.unidadAdministrativa}</p>}
             </div>
           </div>
         </div>
@@ -238,31 +331,37 @@ export default function EmpleadoForm() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="md:col-span-2">
               <label className="block text-xs font-medium text-neutral-600 mb-1">Calle / Dirección *</label>
-              <input type="text" name="direccion" value={formData.direccion} onChange={handleChange} required className="w-full text-sm px-3 py-2 border border-neutral-300 rounded focus:outline-none focus:border-neutral-900 transition-colors" />
+              <input type="text" name="direccion" value={formData.direccion} onChange={handleChange} required className={getInputClass('direccion')} />
             </div>
             <div>
               <label className="block text-xs font-medium text-neutral-600 mb-1">Num. Exterior *</label>
-              <input type="text" name="numeroExterior" value={formData.numeroExterior} onChange={handleChange} required className="w-full text-sm px-3 py-2 border border-neutral-300 rounded focus:outline-none focus:border-neutral-900 transition-colors" />
+              <input type="text" name="numeroExterior" value={formData.numeroExterior} onChange={handleChange} required className={getInputClass('numeroExterior')} />
+              {errors.numeroExterior && <p className="text-[11px] text-red-500 mt-0.5">{errors.numeroExterior}</p>}
             </div>
             <div>
               <label className="block text-xs font-medium text-neutral-600 mb-1">Num. Interior</label>
-              <input type="text" name="numeroInterior" value={formData.numeroInterior} onChange={handleChange} placeholder="N/A" className="w-full text-sm px-3 py-2 border border-neutral-300 rounded focus:outline-none focus:border-neutral-900 transition-colors" />
+              <input type="text" name="numeroInterior" value={formData.numeroInterior} onChange={handleChange} placeholder="N/A" className={getInputClass('numeroInterior')} />
+              {errors.numeroInterior && <p className="text-[11px] text-red-500 mt-0.5">{errors.numeroInterior}</p>}
             </div>
             <div>
               <label className="block text-xs font-medium text-neutral-600 mb-1">Colonia *</label>
-              <input type="text" name="colonia" value={formData.colonia} onChange={handleChange} required className="w-full text-sm px-3 py-2 border border-neutral-300 rounded focus:outline-none focus:border-neutral-900 transition-colors" />
+              <input type="text" name="colonia" value={formData.colonia} onChange={handleChange} required className={getInputClass('colonia')} />
+              {errors.colonia && <p className="text-[11px] text-red-500 mt-0.5">{errors.colonia}</p>}
             </div>
             <div>
               <label className="block text-xs font-medium text-neutral-600 mb-1">Código Postal *</label>
-              <input type="text" name="codigoPostal" value={formData.codigoPostal} onChange={handleChange} required className="w-full text-sm px-3 py-2 border border-neutral-300 rounded focus:outline-none focus:border-neutral-900 transition-colors" />
+              <input type="text" name="codigoPostal" value={formData.codigoPostal} onChange={handleChange} required className={getInputClass('codigoPostal')} />
+              {errors.codigoPostal && <p className="text-[11px] text-red-500 mt-0.5">{errors.codigoPostal}</p>}
             </div>
             <div>
               <label className="block text-xs font-medium text-neutral-600 mb-1">Ciudad *</label>
-              <input type="text" name="ciudad" value={formData.ciudad} onChange={handleChange} required className="w-full text-sm px-3 py-2 border border-neutral-300 rounded focus:outline-none focus:border-neutral-900 transition-colors" />
+              <input type="text" name="ciudad" value={formData.ciudad} onChange={handleChange} required className={getInputClass('ciudad')} />
+              {errors.ciudad && <p className="text-[11px] text-red-500 mt-0.5">{errors.ciudad}</p>}
             </div>
             <div>
               <label className="block text-xs font-medium text-neutral-600 mb-1">Municipio *</label>
-              <input type="text" name="municipio" value={formData.municipio} onChange={handleChange} required className="w-full text-sm px-3 py-2 border border-neutral-300 rounded focus:outline-none focus:border-neutral-900 transition-colors" />
+              <input type="text" name="municipio" value={formData.municipio} onChange={handleChange} required className={getInputClass('municipio')} />
+              {errors.municipio && <p className="text-[11px] text-red-500 mt-0.5">{errors.municipio}</p>}
             </div>
           </div>
         </div>
@@ -270,7 +369,7 @@ export default function EmpleadoForm() {
         {/* Botón de Envío */}
         <div className="pt-4 flex justify-end">
           <button type="submit" className="px-6 py-2 bg-neutral-950 text-white text-sm font-medium rounded hover:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-neutral-950 transition-colors shadow-sm">
-            Guardar Cambios
+            Actualizar Datos
           </button>
         </div>
 
