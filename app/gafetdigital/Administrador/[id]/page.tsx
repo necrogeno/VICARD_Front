@@ -33,10 +33,9 @@ export default function EmpleadoForm() {
 
   const [foto, setFoto] = useState<File | null>(null);
   const [currentFotoUrl, setCurrentFotoUrl] = useState<string>('');
+  const [previewUrl, setPreviewUrl] = useState<string>(''); // Para mostrar la vista previa en tiempo real
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Estado para capturar los errores de validación por campo
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // 1. Cargar los datos desde el servicio
@@ -77,13 +76,14 @@ export default function EmpleadoForm() {
 
           if (jsonDeMongoDB.Foto) {
             setCurrentFotoUrl(jsonDeMongoDB.Foto);
+            setPreviewUrl(jsonDeMongoDB.Foto); // Muestra la foto alojada en public/Fotos por defecto
           }
         }
       } catch (err: any) {
         console.error("Error al cargar el empleado:", err);
         setError(err.message || "No se pudo cargar la información del empleado.");
       } finally {
-        setLoading(false);
+        loading && setLoading(false);
       }
     };
 
@@ -93,7 +93,6 @@ export default function EmpleadoForm() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     
-    // Limpiamos el error del campo que el usuario está editando actualmente
     if (errors[name]) {
       setErrors(prev => {
         const newErrors = { ...prev };
@@ -112,22 +111,19 @@ export default function EmpleadoForm() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFoto(e.target.files[0]);
+      const file = e.target.files[0];
+      setFoto(file);
+      setPreviewUrl(URL.createObjectURL(file)); // Reemplaza la vista previa con el nuevo archivo local
     }
   };
 
   // Función de validación de negocio
   const validateForm = () => {
     const localErrors: Record<string, string> = {};
-    
-    // Expresiones regulares básicas
     const regexSoloNumeros = /^[0-9]+$/;
-    // Permite letras, espacios, acentos y la Ñ
     const regexSoloLetras = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/;
-    // Validación estándar de email
     const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    // 1. Validar Campos Numéricos
     if (formData.extension && !regexSoloNumeros.test(formData.extension)) {
       localErrors.extension = "La extensión debe contener solo números.";
     }
@@ -141,7 +137,6 @@ export default function EmpleadoForm() {
       localErrors.codigoPostal = "El código postal debe contener solo números.";
     }
 
-    // 2. Validar Campos de Texto (Solo Letras)
     if (formData.nombres && !regexSoloLetras.test(formData.nombres)) {
       localErrors.nombres = "El nombre solo debe contener letras.";
     }
@@ -164,13 +159,12 @@ export default function EmpleadoForm() {
       localErrors.municipio = "El municipio solo debe contener letras.";
     }
 
-    // 3. Validar Correo Electrónico
     if (formData.email && !regexEmail.test(formData.email)) {
-      localErrors.email = "Por favor, introduce un correo electrónico válido (ejemplo@gob.mx).";
+      localErrors.email = "Por favor, introduce un correo electrónico válido.";
     }
 
     setErrors(localErrors);
-    return Object.keys(localErrors).length === 0; // Devuelve true si no hay errores
+    return Object.keys(localErrors).length === 0;
   };
 
   // 2. Guardar los datos editados
@@ -182,13 +176,49 @@ export default function EmpleadoForm() {
       return;
     }
 
-    // Ejecutar validaciones locales antes de enviar
     if (!validateForm()) {
       alert("Por favor, corrige los campos marcados en rojo antes de continuar.");
       return;
     }
     
     try {
+      let finalFotoUrl = currentFotoUrl;
+
+      // SI EL USUARIO SELECCIONÓ UNA NUEVA FOTO
+      if (foto) {
+        // A. Subir la imagen al servidor con route.ts usando FormData
+        const uploadData = new FormData();
+        uploadData.append('file', foto);
+
+        // Se envía a tu endpoint existente (services/upload/route.ts mapeado en /api/upload)
+        const uploadResponse = await fetch('/services/upload', {
+          method: 'POST',
+          body: uploadData,
+        });
+
+        if (!uploadResponse.ok) {
+          throw new Error("No se pudo subir la nueva fotografía.");
+        }
+
+        const uploadResult = await uploadResponse.json();
+        finalFotoUrl = uploadResult.url; // Nueva ruta guardada en el backend (ej: /Fotos/archivo.ext)
+
+        // B. Eliminar la foto anterior de la carpeta si existía una previa diferente
+        if (currentFotoUrl && currentFotoUrl !== finalFotoUrl) {
+          try {
+            await fetch('/services/upload/delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ fotoUrl: currentFotoUrl }),
+            });
+          } catch (deleteErr) {
+            console.error("No se pudo remover la foto antigua del disco duro:", deleteErr);
+            // No detenemos el flujo principal si falla el borrado del archivo huérfano
+          }
+        }
+      }
+
+      // C. Estructurar el Payload final con la ruta correcta de la imagen
       const dbPayload = {
         IdEmpleado: formData.idEmpleado,
         Nombres: formData.nombres,
@@ -209,7 +239,7 @@ export default function EmpleadoForm() {
         Municipio: formData.municipio,
         Pais: formData.pais,
         Activo: formData.activo,
-        Foto: currentFotoUrl 
+        Foto: finalFotoUrl 
       };
 
       console.log(`Actualizando registro con ID: ${id}`, dbPayload);
@@ -230,7 +260,6 @@ export default function EmpleadoForm() {
   if (loading) return <div className="text-center my-10 text-sm text-neutral-500">Cargando datos del personal...</div>;
   if (error) return <div className="text-center my-10 text-sm text-red-500">{error}</div>;
 
-  // Función utilitaria para aplicar clases dinámicas de Tailwind según el estado de error
   const getInputClass = (fieldName: string) => {
     const baseClass = "w-full text-sm px-3 py-2 border rounded focus:outline-none transition-colors";
     if (errors[fieldName]) {
@@ -251,32 +280,55 @@ export default function EmpleadoForm() {
         {/* SECCIÓN: Información Personal */}
         <div>
           <h2 className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-3">Información Personal</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-neutral-600 mb-1">ID Empleado</label>
-              <input type="text" name="idEmpleado" value={formData.idEmpleado} onChange={handleChange} placeholder="N/A o Número" className={getInputClass('idEmpleado')} />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-xs font-medium text-neutral-600 mb-1">Nombre(s) *</label>
-              <input type="text" name="nombres" value={formData.nombres} onChange={handleChange} required className={getInputClass('nombres')} />
-              {errors.nombres && <p className="text-[11px] text-red-500 mt-0.5">{errors.nombres}</p>}
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-neutral-600 mb-1">Primer Apellido *</label>
-              <input type="text" name="primerApellido" value={formData.primerApellido} onChange={handleChange} required className={getInputClass('primerApellido')} />
-              {errors.primerApellido && <p className="text-[11px] text-red-500 mt-0.5">{errors.primerApellido}</p>}
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-neutral-600 mb-1">Segundo Apellido</label>
-              <input type="text" name="segundoApellido" value={formData.segundoApellido} onChange={handleChange} className={getInputClass('segundoApellido')} />
-              {errors.segundoApellido && <p className="text-[11px] text-red-500 mt-0.5">{errors.segundoApellido}</p>}
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-neutral-600 mb-1">Fotografía del Personal</label>
-              <input type="file" accept="image/*" onChange={handleFileChange} className="w-full text-xs text-neutral-500 file:mr-4 file:py-2 file:px-3 file:rounded file:border-0 file:text-xs file:font-medium file:bg-neutral-100 file:text-neutral-700 hover:file:bg-neutral-200 cursor-pointer" />
-              {currentFotoUrl && !foto && (
-                <p className="text-[10px] text-neutral-400 mt-1 truncate">Foto actual: {currentFotoUrl}</p>
+          
+          {/* Contenedor de Flex/Grid para incluir la Visualización de la Fotografía */}
+          <div className="flex flex-col md:flex-row gap-6 mb-4">
+            
+            {/* Visualizador de Perfil */}
+            <div className="flex flex-col items-center justify-center p-4 border border-neutral-200 rounded-lg bg-neutral-50 min-w-[150px]">
+              <label className="block text-xs font-semibold text-neutral-500 mb-2">Vista Previa</label>
+              {previewUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img 
+                  src={previewUrl} 
+                  alt="Perfil" 
+                  className="w-28 h-32 object-cover rounded-md border border-neutral-300 shadow-sm bg-white"
+                />
+              ) : (
+                <div className="w-28 h-32 bg-neutral-200 rounded-md flex items-center justify-center text-xs text-neutral-400 text-center px-2">
+                  Sin Foto
+                </div>
               )}
+            </div>
+
+            {/* Campos de Texto */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1">
+              <div>
+                <label className="block text-xs font-medium text-neutral-600 mb-1">ID Empleado</label>
+                <input type="text" name="idEmpleado" value={formData.idEmpleado} onChange={handleChange} placeholder="N/A o Número" className={getInputClass('idEmpleado')} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-neutral-600 mb-1">Nombre(s) *</label>
+                <input type="text" name="nombres" value={formData.nombres} onChange={handleChange} required className={getInputClass('nombres')} />
+                {errors.nombres && <p className="text-[11px] text-red-500 mt-0.5">{errors.nombres}</p>}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-neutral-600 mb-1">Primer Apellido *</label>
+                <input type="text" name="primerApellido" value={formData.primerApellido} onChange={handleChange} required className={getInputClass('primerApellido')} />
+                {errors.primerApellido && <p className="text-[11px] text-red-500 mt-0.5">{errors.primerApellido}</p>}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-neutral-600 mb-1">Segundo Apellido</label>
+                <input type="text" name="segundoApellido" value={formData.segundoApellido} onChange={handleChange} className={getInputClass('segundoApellido')} />
+                {errors.segundoApellido && <p className="text-[11px] text-red-500 mt-0.5">{errors.segundoApellido}</p>}
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs font-medium text-neutral-600 mb-1">Cambiar Fotografía del Personal</label>
+                <input type="file" accept="image/*" onChange={handleFileChange} className="w-full text-xs text-neutral-500 file:mr-4 file:py-2 file:px-3 file:rounded file:border-0 file:text-xs file:font-medium file:bg-neutral-100 file:text-neutral-700 hover:file:bg-neutral-200 cursor-pointer" />
+                {currentFotoUrl && (
+                  <p className="text-[10px] text-neutral-400 mt-1 truncate">Ruta actual en BD: {currentFotoUrl}</p>
+                )}
+              </div>
             </div>
           </div>
         </div>
