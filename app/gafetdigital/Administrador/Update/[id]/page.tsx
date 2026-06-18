@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { GafetService } from '../../../services/api'; // Ajusta la ruta según tu estructura de carpetas
+import { GafetService } from '../../../../services/api'; // Ajusta la ruta según tu estructura de carpetas
 
 export default function EmpleadoForm() {
   const params = useParams();

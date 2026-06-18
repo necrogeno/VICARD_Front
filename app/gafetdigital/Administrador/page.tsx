@@ -1,468 +1,524 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import Image from 'next/image';
+
+import { GafetService } from '../../services/api'; 
+
 import { 
-  LayoutDashboard, 
-  Users, 
-  Settings, 
   Search, 
-  Plus, 
-  Trash2, 
-  Edit2,  
-  UserCheck, 
-  UserX,
-  Palette
-} from "lucide-react";
-import { GafetService } from "../../services/api"; 
+  Menu, 
+  User, 
+  Lock, 
+  LogOut, 
+  Users, 
+  Contact, 
+  CheckCircle2, 
+  MinusCircle, 
+  RefreshCw, 
+  History, 
+  ArrowUpDown, 
+  ChevronRight,
+  UserPlus,
+  ChevronDown
+} from 'lucide-react';
 
-// --- INTERFAZ DE TYPESCRIPT CORREGIDA ---
-interface User {
-  _id?: string;
-  id?: string; 
-  Activo: boolean; 
-  CentroTrabajo?: string;
-  Ciudad?: string;
-  CodigoPostal?: string;
-  Colonia?: string;
-  Direccion?: string;
-  Extension?: string;
-  Foto?: string;
-  IdEmpleado?: string;
-  Municipio?: string;
-  Nombres: string; 
-  NumeroExterior?: string;
-  NumeroInterior?: string;
-  Pais?: string;
-  PrimerApellido?: string; 
-  SegundoApellido?: string; 
-  Puesto: string;
-  Telefono?: string; 
-  UnidadAdministrativa?: string;
-  email: string;
-}
+const formatHeaderDate = (date: Date) => {
+  const dias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  return `${dias[date.getDay()]} ${date.getDate()} de ${meses[date.getMonth()]}, ${date.getFullYear()}`;
+};
 
-export default function AdminDashboard() {
-  // --- ESTADOS ---
-  const [activeTab, setActiveTab] = useState<"dashboard" | "users" | "settings">("dashboard");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [themeColor, setThemeColor] = useState<"blue" | "emerald" | "violet">("blue");
+const formatHeaderTime = (date: Date) => {
+  let hours = date.getHours();
+  const minutes = date.getMinutes();
+  const seconds = date.getSeconds();
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  
+  hours = hours % 12;
+  hours = hours ? hours : 12; 
+  
+  const strHours = hours < 10 ? '0' + hours : hours;
+  const strMinutes = minutes < 10 ? '0' + minutes : minutes;
+  const strSeconds = seconds < 10 ? '0' + seconds : seconds;
+  
+  return `${strHours}:${strMinutes}:${strSeconds} ${ampm}`;
+};
 
-  const [users, setUsers] = useState<User[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+export default function BusquedaUsuarioPage() {
+  const router = useRouter();
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [formData, setFormData] = useState({ 
-    Nombres: "", 
-    PrimerApellido: "",
-    SegundoApellido: "",
-    email: "", 
-    Telefono: "", 
-    Puesto: "Usuario", 
-    Activo: true 
-  });
+  // Estados base
+  const [resultadosTabla, setResultadosTabla] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedUnidad, setSelectedUnidad] = useState("");
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
 
-  // --- EFECTO: CARGAR DATOS ---
-  const fetchUsers = async () => {
+  // Estados de Paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
+
+  // NUEVOS ESTADOS: Control de ordenamiento (Por defecto ordena por Nombre de forma Ascendente)
+  const [sortBy, setSortBy] = useState<"Nombre" | "IdEmpleado">("Nombre");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+
+  // Función para obtener/recargar datos de la API (Envuelta en useCallback para poder reutilizarla)
+  const fetchUsuarios = useCallback(async () => {
     try {
       setIsLoading(true);
       const data = await GafetService.getAll();
-      setUsers(data);
+      if (Array.isArray(data)) {
+        setResultadosTabla(data);
+      } else {
+        setResultadosTabla([]); 
+      }
     } catch (error) {
-      console.error("Error al obtener los usuarios:", error);
-      alert("No se pudieron cargar los usuarios desde el servidor.");
+      console.error("Error obteniendo los usuarios:", error);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchUsers();
   }, []);
 
-  // --- MAPEO DE COLORES DINÁMICOS ---
-  const themeClasses = {
-    blue: { bg: "bg-blue-600", text: "text-blue-600", border: "border-blue-600", hover: "hover:bg-blue-700", lightBg: "bg-blue-50" },
-    emerald: { bg: "bg-emerald-600", text: "text-emerald-600", border: "border-emerald-600", hover: "hover:bg-emerald-700", lightBg: "bg-emerald-50" },
-    violet: { bg: "bg-violet-600", text: "text-violet-600", border: "border-violet-600", hover: "hover:bg-violet-700", lightBg: "bg-violet-50" },
-  };
+  // Carga inicial
+  useEffect(() => {
+    fetchUsuarios();
+  }, [fetchUsuarios]);
 
-  const currentTheme = themeClasses[themeColor];
+  // Reloj en tiempo real
+  useEffect(() => {
+    setCurrentTime(new Date());
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
-  // --- LÓGICA DE FILTRADO CORREGIDA (Incluye Teléfono) ---
-  const filteredUsers = useMemo(() => {
-    return users.filter(user => {
-      const nombreCompleto = `${user.Nombres || ''} ${user.PrimerApellido || ''} ${user.SegundoApellido || ''}`.toLowerCase();
-      const query = searchQuery.toLowerCase();
+  // Reiniciar a la página 1 ante cambios de filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedUnidad, sortBy, sortOrder]);
 
-      return (
-        nombreCompleto.includes(query) ||
-        user.email?.toLowerCase().includes(query) ||
-        user.Puesto?.toLowerCase().includes(query) ||
-        user.Telefono?.toLowerCase().includes(query) // <-- SOLUCIÓN AL BUSCADOR POR TELÉFONO
-      );
-    });
-  }, [users, searchQuery]);
-
-  // --- MANEJADORES DE MODAL ---
-  const handleOpenAddModal = () => {
-    setEditingUser(null);
-    setFormData({ Nombres: "", PrimerApellido: "", SegundoApellido: "", email: "", Telefono: "", Puesto: "Usuario", Activo: true });
-    setIsModalOpen(true);
-  };
-
-  const handleOpenEditModal = (user: User) => {
-    setEditingUser(user);
-    setFormData({ 
-      Nombres: user.Nombres || "", 
-      PrimerApellido: user.PrimerApellido || "",
-      SegundoApellido: user.SegundoApellido || "",
-      email: user.email || "", 
-      Telefono: user.Telefono || "", 
-      Puesto: user.Puesto || "Usuario", 
-      Activo: user.Activo
-    });
-    setIsModalOpen(true);
-  };
-
-  const handleSaveUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      if (editingUser) {
-        alert("Función de actualización pendiente en GafetService.");
-      } else {
-        await GafetService.create(formData);
-      }
-      setIsModalOpen(false);
-      fetchUsers(); 
-    } catch (error) {
-      console.error("Error al guardar el usuario:", error);
-      alert("Hubo un error al procesar la solicitud.");
+  // Función para alternar u ordenar los elementos
+  const handleToggleSort = () => {
+    if (sortOrder === "asc") {
+      setSortOrder("desc");
+    } else {
+      // Si ya estaba en desc, podemos alternar la columna o regresar a asc
+      setSortOrder("asc");
     }
   };
 
-  const handleDeleteUser = async (userId: string) => {
-    if (confirm("¿Estás seguro de que deseas eliminar este usuario?")) {
-      try {
-        alert("Para eliminar permanentemente, añade el método DELETE en tu GafetService.");
-        setUsers(users.filter(user => (user._id || user.id) !== userId));
-      } catch (error) {
-        console.error("Error al eliminar el usuario:", error);
-      }
-    }
+  // Función para limpiar filtros e historial de búsqueda (Botón Historial/Reset)
+  const handleResetFilters = () => {
+    setSearchTerm("");
+    setSelectedUnidad("");
+    setSortBy("Nombre");
+    setSortOrder("asc");
+    setCurrentPage(1);
   };
+
+  // Filtra Y ORDENA los usuarios basándose en los estados reactivos
+  const usuariosFiltrados = useMemo(() => {
+    const filtrados = resultadosTabla.filter((row) => {
+      const nombreCompleto = `${row.Nombres || ''} ${row.PrimerApellido || ''} ${row.SegundoApellido || ''}`.trim().toLowerCase();
+      const cumpleNombre = nombreCompleto.includes(searchTerm.toLowerCase());
+
+      const unidadUsuario = (row.UnidadAdministrativa || '').trim().toLowerCase();
+      const cumpleUnidad = selectedUnidad === "" || unidadUsuario === selectedUnidad.toLowerCase();
+
+      return cumpleNombre && cumpleUnidad;
+    });
+
+    // Aplicar ordenamiento dinámico
+    return filtrados.sort((a, b) => {
+      let campoA = "";
+      let campoB = "";
+
+      if (sortBy === "Nombre") {
+        campoA = `${a.Nombres || ''} ${a.PrimerApellido || ''}`.trim().toLowerCase();
+        campoB = `${b.Nombres || ''} ${b.PrimerApellido || ''}`.trim().toLowerCase();
+      } else if (sortBy === "IdEmpleado") {
+        campoA = String(a.IdEmpleado || "").toLowerCase();
+        campoB = String(b.IdEmpleado || "").toLowerCase();
+      }
+
+      if (campoA < campoB) return sortOrder === "asc" ? -1 : 1;
+      if (campoA > campoB) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [resultadosTabla, searchTerm, selectedUnidad, sortBy, sortOrder]);
+
+  // Lógica de Paginación
+  const totalPages = Math.ceil(usuariosFiltrados.length / itemsPerPage) || 1;
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  
+  const usuariosPaginados = useMemo(() => {
+    return usuariosFiltrados.slice(indexOfFirstItem, indexOfLastItem);
+  }, [usuariosFiltrados, indexOfFirstItem, indexOfLastItem]);
+
+  // Últimos 10 registros del panel derecho
+  const ultimosRegistros = useMemo(() => {
+    const getTiempo = (fechaStr: string) => {
+      if (!fechaStr) return 0;
+      const parts = fechaStr.split('/');
+      if (parts.length === 3) {
+        return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0])).getTime();
+      }
+      return new Date(fechaStr).getTime() || 0; 
+    };
+
+    return [...resultadosTabla]
+      .filter((row) => row.FechaRegistro && row.FechaRegistro.trim() !== '')
+      .sort((a, b) => getTiempo(b.FechaRegistro) - getTiempo(a.FechaRegistro))
+      .slice(0, 10);
+  }, [resultadosTabla]);
 
   return (
-    <div className="flex h-screen bg-gray-100 font-sans antialiased text-gray-800">
+    <div className="min-h-screen bg-[#F9FAFC] flex flex-col font-sans text-gray-800 selection:bg-blue-200">
       
-      {/* SIDEBAR */}
-      <aside className="w-56 bg-white border-r border-gray-200 flex flex-col justify-between">
-        <div>
-          <div className="p-6 flex items-center gap-3 border-b border-gray-100">
-            <div className={`p-2 rounded-lg text-white ${currentTheme.bg}`}>
-              <LayoutDashboard size={20} />
-            </div>
-            <span className="font-bold text-lg tracking-tight">Administrador</span>
+      {/* 1. GOBERNACIÓN TOP BAR */}
+      <div className="bg-[#0056B3] text-white text-[10px] py-1.5 text-center border-b border-blue-700 px-4">
+        identificame.chihuahua.gob.mx es un sitio oficial de Gobierno del Estado de Chihuahua. 
+        <span className="underline ml-1 cursor-pointer hover:text-gray-200">¿Cómo saberlo?</span>
+      </div>
+
+      {/* 2. MAIN HEADER */}
+      <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between shadow-sm">
+        <div className="flex items-center gap-4">
+          <button className="text-gray-600 hover:text-gray-900 transition">
+            <Menu className="w-6 h-6" />
+          </button>
+          <div className="flex items-center gap-2 pr-18">
+            <Image
+              src='/Logo-Institucional-Gobierno-2025-Horizontal-Azul.svg' 
+              alt="Gobierno del estado"
+              width={200} 
+              height={50}
+              className='object-cover'
+            />
           </div>
-          
-          <nav className="p-4 space-y-1">
-            <button 
-              onClick={() => setActiveTab("dashboard")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                activeTab === "dashboard" ? `${currentTheme.lightBg} ${currentTheme.text}` : "text-gray-500 hover:bg-gray-50"
-              }`}
-            >
-              <LayoutDashboard size={18} /> Dashboard
-            </button>
-            <button 
-              onClick={() => setActiveTab("users")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                activeTab === "users" ? `${currentTheme.lightBg} ${currentTheme.text}` : "text-gray-500 hover:bg-gray-50"
-              }`}
-            >
-              <Users size={18} /> Usuarios
-            </button>
-            <button 
-              onClick={() => setActiveTab("settings")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                activeTab === "settings" ? `${currentTheme.lightBg} ${currentTheme.text}` : "text-gray-500 hover:bg-gray-50"
-              }`}
-            >
-              <Settings size={18} /> Configuración
-            </button>
+            <div className="text-xl text-center font-bold text-blue-900 ml-2 w-full">
+              identificame.<span className="text-[#0056B3]">chihuahua.gob.mx</span>
+            </div>
+        </div>
+
+        <div className="flex items-center gap-6 text-xs text-gray-500">
+          <div className="text-right tabular-nums">
+            <span className="block text-[10px] uppercase font-bold text-gray-400">
+              {currentTime ? formatHeaderDate(currentTime) : "Cargando..."}
+            </span>
+            <span className="text-blue-900 font-bold text-sm min-w-[85px] inline-block">
+              {currentTime ? formatHeaderTime(currentTime) : "--:--:--"}
+            </span>
+          </div>
+          <div className="flex items-center gap-4 border-l pl-6 border-gray-200 text-gray-600">
+            <button className="hover:text-blue-600"><User className="w-5 h-5" /></button>
+            <button className="hover:text-blue-600"><Lock className="w-5 h-5" /></button>
+            <button className="hover:text-red-600"><LogOut className="w-5 h-5" /></button>
+          </div>
+        </div>
+      </header>
+
+      {/* 3. WORKSPACE CONTAINER */}
+      <div className="flex-1 flex overflow-hidden">
+        
+        {/* SIDEBAR IZQUIERDO */}
+        <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
+          <div className="p-4 text-xs font-bold text-blue-900 uppercase tracking-wider border-b border-gray-100">
+            Gestión de Usuarios
+          </div>
+          <nav className="flex-1 py-2">
+            <a href="#" className="flex items-center gap-3 px-4 py-3 bg-[#0056B3] text-white font-medium text-sm transition">
+              <Users className="w-5 h-5" />
+              Búsqueda de Usuarios
+            </a>
+            <a href="#" className="flex items-center gap-3 px-4 py-3 text-gray-600 hover:bg-gray-50 text-sm transition">
+              <Contact className="w-5 h-5" />
+              Lista de Servidores
+            </a>
           </nav>
-        </div>
-        <div className="p-4 border-t border-gray-100 text-xs text-gray-400 text-center">
-          v1.0.0 — Conectado a Producción
-        </div>
-      </aside>
-
-      {/* CONTENIDO PRINCIPAL */}
-      <main className="flex-1 flex flex-col overflow-y-auto">
-        <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-8 sticky top-0 z-10">
-          <h1 className="text-xl font-semibold capitalize text-gray-900">{activeTab}</h1>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-sm font-medium text-gray-900">Admin</p>
-              <p className="text-xs text-gray-500">Admin Role</p>
-            </div>
-            <div className={`h-10 w-10 rounded-full ${currentTheme.bg} text-white flex items-center justify-center font-bold`}>
-              AD
-            </div>
+          <div className="h-1 flex">
+            <div className="w-1/2 bg-[#0056B3]"></div>
+            <div className="w-1/2 bg-purple-400"></div>
           </div>
-        </header>
+        </aside>
 
-        <div className="p-2 max-w-7xl w-full mx-auto space-y-6">
+        {/* CONTENIDO PRINCIPAL CENTRAL */}
+        <main className="flex-1 p-8 overflow-y-auto max-w-5xl mx-auto w-full">
           
-          {/* DASHBOARD */}
-          {activeTab === "dashboard" && (
-            <div className="space-y-6 animate-fadeIn">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-400 uppercase tracking-wider">Usuarios Totales</p>
-                    <p className="text-3xl font-bold text-gray-900 mt-1">{users.length}</p>
-                  </div>
-                  <div className={`p-4 rounded-2xl bg-gray-50 ${currentTheme.text}`}>
-                    <Users size={24} />
-                  </div>
-                </div>
-                <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-400 uppercase tracking-wider">Usuarios Activos</p>
-                    <p className="text-3xl font-bold text-gray-900 mt-1">
-                      {users.filter(u => u.Activo === true).length}
-                    </p>
-                  </div>
-                  <div className="p-4 rounded-xl bg-emerald-50 text-emerald-600">
-                    <UserCheck size={24} />
-                  </div>
-                </div>
-                <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-400 uppercase tracking-wider">Usuarios Inactivos</p>
-                    <p className="text-3xl font-bold text-gray-900 mt-1">
-                      {users.filter(u => u.Activo === false).length}
-                    </p>
-                  </div>
-                  <div className={`p-4 rounded-xl bg-red-50 text-red-600`}>
-                    <UserX size={24} />
-                  </div>
-                </div>
-              </div>
-              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-                <h3 className="text-lg font-semibold mb-4">Rendimiento de la Plataforma</h3>
-                <div className="h-64 bg-gray-50 rounded-xl border border-dashed border-gray-200 flex items-center justify-center text-gray-400 text-sm">
-                  [ Espacio reservado para Gráfico de Analíticas ]
-                </div>
-              </div>
-            </div>
-          )}
+          <h1 className="text-4xl font-extrabold text-[#0056B3] text-center mt-4 mb-8 tracking-tight">
+            Búsqueda de Usuario
+          </h1>
 
-          {/* GESTIÓN DE USUARIOS */}
-          {activeTab === "users" && (
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden animate-fadeIn">
-              <div className="p-6 border-b border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4 bg-gray-50/50">
-                <div className="relative w-full sm:w-72">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                  <input 
-                    type="text" 
-                    placeholder="Buscar por nombre, correo, puesto o tel..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-gray-300 transition-all bg-white"
-                  />
-                </div>
-                < a href="/gafetdigital/Administrador/Crear"
-                  className={`w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-medium transition-colors shadow-sm ${currentTheme.bg} ${currentTheme.hover}`}
+          {/* FORMULARIO DE BÚSQUEDA */}
+          <div className="space-y-4 max-w-3xl mx-auto mb-10">
+            <div className="relative">
+              <input 
+                type="text" 
+                placeholder="Nombre del Servidor Público" 
+                className="w-full pl-5 pr-12 py-3 border-2 border-gray-200 rounded-full text-sm focus:outline-none focus:border-blue-500 shadow-sm transition-all"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <button className="absolute right-2 top-1/2 -translate-y-1/2 bg-[#A259FF] text-white p-2 rounded-full hover:bg-purple-600 transition">
+                <Search className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input 
+                type="text" 
+                placeholder="Coordinación de Política Digital" 
+                className="w-full px-5 py-3.5 border-2 border-gray-200 bg-gray-50 rounded-full text-sm text-gray-400 font-medium"
+                disabled
+              />
+              
+              <div className="relative group">
+                <select 
+                  value={selectedUnidad}
+                  onChange={(e) => setSelectedUnidad(e.target.value)}
+                  className="w-full pl-6 pr-12 py-3.5 border-2 border-gray-200 rounded-full text-sm font-medium text-gray-700 bg-white appearance-none focus:outline-none focus:border-[#0056B3] focus:ring-4 focus:ring-blue-50 hover:border-gray-300 transition-all cursor-pointer shadow-sm truncate"
                 >
-                  <Plus size={16} /> Agregar Usuario
-                </a>
-              </div>
-
-              {isLoading ? (
-                <div className="py-20 text-center text-gray-500 text-sm">
-                  Cargando registros desde la base de datos...
+                  <option value="">Todas las Unidades Administrativas</option>
+                  <option value="Departamento de Datos y Ciberseguridad">Departamento de Datos y Ciberseguridad</option>
+                  <option value="Departamento Desarrollo y Estrategias Digitales">Departamento Desarrollo y Estrategias Digitales</option>
+                  <option value="Departamento de Telefonía Y Servicios Electrónicos">Departamento de Telefonía Y Servicios Electrónicos</option>
+                  <option value="Departamento de Desarrollo y Ciberseguridad">Departamento de Desarrollo y Ciberseguridad</option>
+                </select>
+                <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none transition-transform duration-200 text-gray-400 group-hover:text-[#0056B3]">
+                  <ChevronDown className="w-4 h-4" strokeWidth={2.5} />
                 </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="border-b border-gray-200 text-xs font-semibold uppercase tracking-wider text-gray-400 bg-gray-50/70">
-                        <th className="px-6 py-4">Nombre</th>
-                        <th className="px-6 py-4">Email</th>
-                        <th className="px-6 py-4">Teléfono</th>
-                        <th className="px-6 py-4">Puesto</th>
-                        <th className="px-6 py-4">Estado</th>
-                        <th className="px-6 py-4 text-right">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 text-sm">
-                      {filteredUsers.length > 0 ? (
-                        filteredUsers.map((user) => {
-                          const currentId = user._id || user.id || "";
-                          const nombreCompleto = `${user.Nombres || ''} ${user.PrimerApellido || ''} ${user.SegundoApellido || ''}`.trim();
-
-                          return (
-                            <tr key={currentId} className="hover:bg-gray-50/50 transition-colors">
-                              <td className="px-6 py-4 font-medium text-gray-900">
-                                <a href={`/gafetdigital/Administrador/${currentId}`}>{nombreCompleto || "Sin Nombre"}</a>
-                              </td>
-                              <td className="px-6 py-4 text-gray-500">
-                                {/* Ajustado a un ancho máximo menor (max-w-[130px]) */}
-                                <a 
-                                  href={`/gafetdigital/Administrador/${currentId}`} 
-                                  className="max-w-[130px] truncate block text-blue-600 hover:underline" 
-                                  title={user.email}
-                                >
-                                  {user.email}
-                                </a>
-                              </td>
-                              <td className="px-6 py-4 text-gray-600">
-                                <a href={`/gafetdigital/Administrador/${currentId}`}>{user.Telefono || "—"}</a>
-                              </td>
-                              <td className="px-6 py-4 text-gray-600"> 
-                                <a href={`/gafetdigital/Administrador/${currentId}`}>
-                                  <span className="px-2.5 py-1 bg-gray-100 rounded-lg text-xs font-medium inline-block max-w-xs truncate">
-                                    {user.Puesto}
-                                  </span>
-                                </a>
-                              </td>
-                              <td className="px-6 py-4">
-                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                  user.Activo ? "bg-emerald-50 text-emerald-700" : "bg-red-100 text-red-600"
-                                }`}>
-                                  <span className={`h-1.5 w-1.5 rounded-full ${user.Activo ? "bg-emerald-500" : "bg-red-400"}`} />
-                                  {user.Activo ? "Activo" : "Inactivo"}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 text-right space-x-2">
-                                <button 
-                                  onClick={() => handleOpenEditModal(user)}
-                                  className="p-1.5 inline-flex items-center text-gray-400 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition-all"
-                                  title="Editar"
-                                >
-                                  <Edit2 size={16} />
-                                </button>
-                                <button 
-                                  onClick={() => handleDeleteUser(currentId)}
-                                  className="p-1.5 inline-flex items-center text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-all"
-                                  title="Eliminar"
-                                >
-                                  <Trash2 size={16} />
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      ) : (
-                        <tr>
-                          <td colSpan={6} className="px-6 py-12 text-center text-gray-400">
-                            No se encontraron usuarios coincidentes.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* CONFIGURACIÓN */}
-          {activeTab === "settings" && (
-            <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm max-w-2xl animate-fadeIn space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                  <Palette size={20} className={currentTheme.text} /> Personalización de la Interfaz
-                </h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  Selecciona el color de acento para los botones, estados activos y elementos visuales del panel.
-                </p>
-              </div>
-              <hr className="border-gray-100" />
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <button onClick={() => setThemeColor("blue")} className={`p-4 border rounded-xl flex flex-col items-center gap-2 transition-all ${themeColor === "blue" ? "border-blue-600 bg-blue-50/50 ring-2 ring-blue-100" : "border-gray-200 hover:bg-gray-50"}`}>
-                  <div className="w-8 h-8 rounded-full bg-blue-600 shadow-sm" />
-                  <span className="text-sm font-medium">Azul Corporativo</span>
-                </button>
-                <button onClick={() => setThemeColor("emerald")} className={`p-4 border rounded-xl flex flex-col items-center gap-2 transition-all ${themeColor === "emerald" ? "border-emerald-600 bg-emerald-50/50 ring-2 ring-emerald-100" : "border-gray-200 hover:bg-gray-50"}`}>
-                  <div className="w-8 h-8 rounded-full bg-emerald-600 shadow-sm" />
-                  <span className="text-sm font-medium">Verde Esmeralda</span>
-                </button>
-                <button onClick={() => setThemeColor("violet")} className={`p-4 border rounded-xl flex flex-col items-center gap-2 transition-all ${themeColor === "violet" ? "border-violet-600 bg-violet-50/50 ring-2 ring-violet-100" : "border-gray-200 hover:bg-gray-50"}`}>
-                  <div className="w-8 h-8 rounded-full bg-violet-600 shadow-sm" />
-                  <span className="text-sm font-medium">Violeta Eléctrico</span>
-                </button>
               </div>
             </div>
-          )}
-        </div>
-      </main>
 
-      {/* MODAL */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div className="bg-white rounded-2xl border border-gray-200 max-w-md w-full shadow-xl overflow-hidden transform transition-all">
-            <div className="p-6 border-b border-gray-100">
-              <h3 className="text-lg font-semibold text-gray-900">
-                {editingUser ? "Modificar Usuario" : "Agregar Nuevo Usuario"}
-              </h3>
+            <div className="flex justify-center pt-2">
+              <button 
+                onClick={() => router.push('/gafetdigital/Administrador/Crear')}
+                className="bg-[#0056B3] w-3xl text-center hover:bg-blue-700 text-white font-semibold px-12 py-3 rounded-full text-sm shadow-md transition-all flex justify-center gap-2"
+              >
+                Añadir Servidor Público
+              </button>
             </div>
-            
-            <form onSubmit={handleSaveUser} className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Nombres</label>
-                <input type="text" required value={formData.Nombres} onChange={(e) => setFormData({ ...formData, Nombres: e.target.value })} className="w-full px-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-200" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Primer Apellido</label>
-                  <input type="text" required value={formData.PrimerApellido} onChange={(e) => setFormData({ ...formData, PrimerApellido: e.target.value })} className="w-full px-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-200" />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Segundo Apellido</label>
-                  <input type="text" value={formData.SegundoApellido} onChange={(e) => setFormData({ ...formData, SegundoApellido: e.target.value })} className="w-full px-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-200" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Correo Electrónico</label>
-                <input type="email" required value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full px-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-200" />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Teléfono</label>
-                <input type="text" value={formData.Telefono} onChange={(e) => setFormData({ ...formData, Telefono: e.target.value })} className="w-full px-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-200" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Puesto</label>
-                  <select value={formData.Puesto} onChange={(e) => setFormData({ ...formData, Puesto: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-200">
-                    <option value="Usuario">Usuario</option>
-                    <option value="Editor">Editor</option>
-                    <option value="Soporte">Soporte</option>
-                    <option value="Analista Programador">Analista Programador</option>
-                    <option value="Desarrollador Jr">Desarrollador Jr</option>
-                    <option value="Administrador">Administrador</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Estado</label>
-                  <select value={formData.Activo ? "Activo" : "Inactivo"} onChange={(e) => setFormData({ ...formData, Activo: e.target.value === "Activo" })} className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-200">
-                    <option value="Activo">Activo</option>
-                    <option value="Inactivo">Inactivo</option>
-                  </select>
-                </div>
-              </div>
-              <div className="pt-4 flex items-center justify-end gap-2 border-t border-gray-100 mt-6">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-500 hover:bg-gray-50 transition-colors">Cancelar</button>
-                <button type="submit" className={`px-4 py-2 text-white rounded-xl text-sm font-medium transition-colors shadow-sm ${currentTheme.bg} ${currentTheme.hover}`}>
-                  {editingUser ? "Modificar Usuario" : "Agregar Usuario"}
-                </button>
-              </div>
-            </form>
           </div>
-        </div>
-      )}
+
+          {/* CONTROLES DE TABLA */}
+          <div className="border-t border-gray-200 pt-6 flex items-center justify-between text-xs text-gray-500 mb-4 px-2">
+            <div className="flex items-center gap-2">
+              <select 
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1); 
+                }}
+                className="border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none cursor-pointer font-medium text-gray-700 shadow-sm"
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+              </select>
+              <span>Resultados por página</span>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <span>
+                Mostrando resultados {usuariosFiltrados.length === 0 ? 0 : indexOfFirstItem + 1} a {Math.min(indexOfLastItem, usuariosFiltrados.length)} de {usuariosFiltrados.length}
+                {sortOrder && ` (Ordenado ${sortOrder === 'asc' ? 'A-Z' : 'Z-A'})`}
+              </span>
+              
+              <div className="flex items-center border border-gray-300 rounded overflow-hidden bg-white shadow-sm">
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-2 py-1 border-r bg-gray-50 hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-gray-50 font-bold transition-all"
+                >
+                  ◀
+                </button>
+                
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`px-3 py-1 font-bold transition-all ${
+                      currentPage === page 
+                        ? 'bg-[#0056B3] text-white' 
+                        : 'text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-2 py-1 border-l bg-gray-50 hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-gray-50 font-bold transition-all"
+                >
+                  ▶
+                </button>
+              </div>
+
+              {/* ACCIONES DE TABLA RE-VINCULADAS */}
+              <div className="flex items-center gap-3 text-blue-600 pl-2 border-l border-gray-300">
+                {/* 1. Recargar los datos directo de la API */}
+                <button 
+                  onClick={fetchUsuarios} 
+                  className={`hover:text-blue-800 ${isLoading ? 'animate-spin' : ''}`}
+                  title="Recargar datos de la API"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+                
+                {/* 2. Limpiar filtros e historial de búsqueda */}
+                <button 
+                  onClick={handleResetFilters} 
+                  className="hover:text-blue-800" 
+                  title="Restablecer filtros"
+                >
+                  <History className="w-4 h-4" />
+                </button>
+                
+                {/* 3. Cambiar orden (Ascendente / Descendente) */}
+                <button 
+                  onClick={handleToggleSort} 
+                  className="hover:text-blue-800" 
+                  title={`Cambiar orden a ${sortOrder === 'asc' ? 'Z-A' : 'A-Z'}`}
+                >
+                  <ArrowUpDown className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* LISTA DE RESULTADOS */}
+          <div className="space-y-3">
+            {isLoading ? (
+              <div className="text-center py-8 text-gray-500 font-medium flex flex-col items-center gap-2">
+                <RefreshCw className="w-6 h-6 animate-spin text-blue-600" />
+                Cargando información...
+              </div>
+            ) : usuariosPaginados.length === 0 ? (
+              <div className="text-center py-8 text-gray-500 font-medium">
+                No se encontraron servidores públicos.
+              </div>
+            ) : (
+              usuariosPaginados.map((row, idx) => {
+                const nombreCompleto = `${row.Nombres || ''} ${row.PrimerApellido || ''} ${row.SegundoApellido || ''}`.trim();
+                
+                return (
+                  <div 
+                    key={idx} 
+                    onClick={() => router.push(`/gafetdigital/Administrador/Update/${row._id}`)}
+                    className="bg-white border border-purple-200 hover:border-purple-400 rounded-full px-6 py-2.5 shadow-sm flex items-center justify-between text-[11px] transition-all cursor-pointer hover:shadow-md"
+                  >
+                    <div className="flex items-center gap-4 w-[12%]">
+                      <CheckCircle2 className={`w-5 h-5 shrink-0 ${row.Activo ? 'text-green-500' : 'text-gray-300'}`} />
+                      <div>
+                        <div className="font-bold text-gray-900">{row.IdEmpleado || "N/A"}</div>
+                        <div className="text-[9px] pr-1 text-gray-400 uppercase">N. Empleado</div>
+                      </div>
+                    </div>
+
+                    <div className="w-[20%]">
+                      <div className="font-bold text-gray-900">{nombreCompleto || "N/A"}</div>
+                      <div className="text-[9px] text-gray-400 uppercase">Nombre</div>
+                    </div>
+
+                    <div className="w-[22%]">
+                      <div className="text-gray-700 font-medium truncate">{row.email || "N/A"}</div>
+                      <div className="text-[9px] text-gray-400 uppercase">Correo Electrónico</div>
+                    </div>
+
+                    <div className="w-[8%]">
+                      <div className="font-bold text-gray-900">{row.Extension || "N/A"}</div>
+                      <div className="text-[9px] text-gray-400 uppercase">Extensión</div>
+                    </div>
+
+                    <div className="w-[20%]">
+                      <div className="font-bold text-gray-900 truncate">{row.CentroTrabajo || "N/A"}</div>
+                      <div className="text-[9px] text-gray-400 uppercase">Dependencia</div>
+                    </div>
+
+                    <div className="w-[12%]">
+                      <div className="text-gray-600 truncate">{row.UnidadAdministrativa || "N/A"}</div>
+                      <div className="text-[9px] text-gray-400 uppercase">Unidad Administrativa</div>
+                    </div>
+
+                    <div className="flex items-center gap-2 w-[6%] justify-end">
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          console.log("Eliminar ID:", row._id);
+                        }}
+                        className="text-pink-600 hover:text-red-700 p-1 rounded-full hover:bg-red-50 transition"
+                      >
+                        <MinusCircle className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </main>
+
+        {/* SIDEBAR DERECHO */}
+        <aside className="w-72 bg-white border-l border-gray-200 p-4 overflow-y-auto">
+          <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-4">
+            <div className="text-[9px] font-bold text-blue-900 uppercase tracking-tighter">
+              Gobierno de Chihuahua <br />
+              <span className="text-gray-500 font-normal">Coordinación de Política Digital</span>
+            </div>
+            <div className="text-right">
+              <span className="text-[10px] block text-gray-400 uppercase font-semibold">Registros Totales</span>
+              <span className="text-3xl font-black text-[#0056B3]">{resultadosTabla.length}</span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold text-[#0056B3]">Últimos Registros</h3>
+            <a href="#" className="text-[10px] text-gray-400 hover:text-blue-600 flex items-center gap-0.5">
+              Ver Usuarios <ChevronRight className="w-3 h-3" />
+            </a>
+          </div>
+
+          <div className="space-y-3">
+            {ultimosRegistros.length === 0 ? (
+              <p className="text-xs text-gray-500 text-center py-4">No hay registros recientes.</p>
+            ) : (
+              ultimosRegistros.map((item, index) => {
+                const nombreCompleto = `${item.Nombres || ''} ${item.PrimerApellido || ''} ${item.SegundoApellido || ''}`.trim();
+                
+                return (
+                  <div 
+                    key={index} 
+                    onClick={() => router.push(`/gafetdigital/Administrador/Update/${item._id}`)}
+                    className="flex items-center justify-between p-2 hover:bg-gray-50 rounded transition-all border-b border-gray-50 pb-2 cursor-pointer"
+                  >
+                    <div className="max-w-[70%]">
+                      <h4 className="text-xs font-bold text-gray-800 truncate" title={nombreCompleto}>
+                        {nombreCompleto || "N/A"}
+                      </h4>
+                      <p className="text-[9px] text-gray-400 uppercase tracking-tight truncate" title={item.UnidadAdministrativa}>
+                        {item.UnidadAdministrativa || "Sin Departamento"}
+                      </p>
+                    </div>
+                    <div className="text-right flex items-center gap-2">
+                      <div>
+                        <span className="text-[10px] font-bold text-gray-700 block text-right">
+                          {item.FechaRegistro}
+                        </span>
+                      </div>
+                      <UserPlus className="w-4 h-4 text-blue-500 shrink-0" />
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </aside>
+
+      </div>
     </div>
   );
 }
