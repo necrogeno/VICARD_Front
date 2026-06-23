@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
+
 
 export default function LoginForm() {
   const [email, setEmail] = useState('');
@@ -8,109 +10,99 @@ export default function LoginForm() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Aquí se manejaría la lógica de autenticación con el backend
     console.log({ email, password });
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-sm border border-slate-100">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-linear-to-br from-[#0c54be] to-[#a452bfab] px-4 font-['Public_Sans',sans-serif] relative select-none">
+      
+      {/* Banner Superior Gobierno del Estado */}
+      <div className="absolute top-0 left-0 w-full text-center py-2 bg-black/10 text-[10px] text-white/80 tracking-wide">
+        eventos.chihuahua.gob.mx es un sitio oficial de Gobierno del Estado de Chihuahua. <span className="underline cursor-pointer">¿Cómo saberlo?</span>
+      </div>
+
+      {/* Contenedor Principal Centrado */}
+      <div className="flex flex-col items-center w-full max-w-[440px]">
         
-        {/* Encabezado */}
-        <div className="text-center">
-          {/* Isotipo/Logo Minimalista con toque lila */}
-          <div className="mx-auto h-12 w-12 rounded-lg bg-gradient-to-tr from-blue-600 via-blue-500 to-purple-400 flex items-center justify-center shadow-sm">
-            <span className="text-white font-bold text-xl">V</span>
-          </div>
-          <h2 className="mt-6 text-2xl font-semibold text-slate-900 tracking-tight">
-            Iniciar sesión
-          </h2>
-          <p className="mt-2 text-sm text-slate-500">
-            Ingresa tus credenciales para acceder a la plataforma
-          </p>
+        {/* Logo / Escudo del Estado (Ancho: 180px) */}
+        <div className="w-[180px] flex flex-col items-center text-center text-white text-xs font-bold tracking-widest leading-tight">
+          <Image
+          alt='Gobierno del Estado de Chihuahua'
+          src="/Logo-Institucional-Vertical-Gobierno-Chihuahua-2025-Blanco.svg"
+          width={180}
+          height={100}
+          
+          />
         </div>
+
+        {/* Espacio de 48px según el plano */}
+        <div className="h-12"></div>
+
+        {/* Subtítulo del Formulario */}
+        <p className="text-white/90 text-base font-normal tracking-wide text-center">
+          Inicio de Sesión · Gestor de VCards
+        </p>
+
+        {/* Espacio de 24px según el plano */}
+        <div className="h-6"></div>
 
         {/* Formulario */}
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="space-y-4">
-            {/* Campo de Correo Electrónico */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1">
-                Correo electrónico
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="appearance-none block w-full px-3 py-2.5 border border-slate-200 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-blue-500 transition-colors text-sm text-slate-900"
-                placeholder="usuario@correo.com"
-              />
-            </div>
-
-            {/* Campo de Contraseña */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label htmlFor="password" className="block text-sm font-medium text-slate-700">
-                  Contraseña
-                </label>
-                <div className="text-sm">
-                  <a href="#" className="font-medium text-blue-600 hover:text-purple-600 transition-colors">
-                    ¿Olvidaste tu contraseña?
-                  </a>
-                </div>
-              </div>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="appearance-none block w-full px-3 py-2.5 border border-slate-200 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-blue-500 transition-colors text-sm text-slate-900"
-                placeholder="••••••••"
-              />
-            </div>
-          </div>
-
-          {/* Opciones Adicionales */}
-          <div className="flex items-center">
-            <input
-              id="remember-me"
-              name="remember-me"
-              type="checkbox"
-              className="h-4 w-4 text-blue-600 focus:ring-purple-400 border-slate-300 rounded transition-colors"
-            />
-            <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-600 select-none">
-              Recordar mi sesión
+        <form className="w-full space-y-4" onSubmit={handleSubmit}>
+          
+          {/* Campo: Correo Institucional */}
+          <div className="relative">
+            <label className="absolute top-2 left-4 text-[10px] text-slate-400 font-medium pointer-events-none">
+              Correo Institucional
             </label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="nombre.apellido@chihuahua.gob.mx"
+              className="w-full bg-[#f1f3f5] text-slate-800 pt-6 pb-2 px-4 rounded-full text-base placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-300 transition-all border border-transparent"
+            />
           </div>
 
-          {/* Botón de Acción Principal */}
-          <div>
-            <button
-              type="submit"
-              className="group relative w-full flex justify-center py-2.5 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-400 shadow-sm transition-all duration-200"
+          {/* Espacio de 16px entre inputs según el plano */}
+          <div className="h-0"></div>
+
+          {/* Campo: RFC / Contraseña */}
+          <div className="relative">
+            <label className="absolute top-2 left-4 text-[10px] text-slate-400 font-medium pointer-events-none">
+              RFC
+            </label>
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="•••••••••••••"
+              className="w-full bg-[#f1f3f5] text-slate-800 pt-6 pb-2 px-4 rounded-full text-base placeholder-slate-400 tracking-widest focus:outline-none focus:ring-2 focus:ring-purple-300 transition-all border border-transparent"
+            />
+            {/* Icono de visibilidad (Ojo) */}
+            <button 
+              type="button" 
+              className="absolute right-4 bottom-3 text-slate-400 hover:text-slate-600"
             >
-              Ingresar al sistema
+              O
             </button>
           </div>
+
+          {/* Espacio de 24px según el plano */}
+          <div className="h-2"></div>
+
+          {/* Botón Iniciar Sesión (Ancho: 240px centrado) */}
+          <div className="flex justify-center w-full">
+            <button
+              type="submit"
+              className="w-[240px] py-2.5 bg-gradient-to-r from-[#9853be] to-[#b169d4] hover:from-[#8742ad] hover:to-[#a058c3] text-white text-base font-bold rounded-full shadow-lg shadow-black/10 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-white/50 text-center"
+            >
+              Iniciar Sesión
+            </button>
+          </div>
+
         </form>
-
-        {/* Footer del Login */}
-        <div className="text-center pt-2">
-          <p className="text-xs text-slate-400">
-            ¿No tienes una cuenta?{' '}
-            <a href="#" className="font-medium text-blue-600 hover:text-purple-600 transition-colors">
-              Solicitar acceso
-            </a>
-          </p>
-        </div>
-
       </div>
     </div>
   );
