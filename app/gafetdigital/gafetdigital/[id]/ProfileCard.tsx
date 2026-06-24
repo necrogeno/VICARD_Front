@@ -119,7 +119,7 @@ export const ProfileCard = ({ persona }: { persona: PersonaProps }) => {
           {/* Fecha de activación o estado */}
           {estaActivo && (
             <p className="text-[11px] text-gray-500 font-medium mt-3 px-3 py-0.5 rounded-full">
-              Activo al: <span className="font-semibold font-gotham text-gray-700">9 de Junio del 2026</span>
+              Activo al: <span className="font-semibold font-gotham text-gray-700">{new Date().toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })}</span>
             </p>
           )}
         </div>
