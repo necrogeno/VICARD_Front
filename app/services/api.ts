@@ -42,4 +42,7 @@ export const GafetService = {
     method: 'PUT', // Cambiar a 'PATCH' si tu API solo actualiza campos parciales
     body: JSON.stringify(data),
   }),
+
+  // Buscar un elemento por correo electrónico
+  getByEmail: (email: string) => apiFetch<any>(`findusuario/${encodeURIComponent(email)}`),
 };

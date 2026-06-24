@@ -1,37 +1,17 @@
-// auth.config.ts
 import type { NextAuthConfig } from 'next-auth';
-import Credentials from 'next-auth/providers/credentials';
 
-export const authConfig = {
+export const authConfig: NextAuthConfig = {
   pages: {
-    signIn: '/gafetdigital/administrador/Login', // Redirige automáticamente aquí si no está autenticado
+    signIn: '/gafetdigital/Administrador/Login',
   },
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
-      const isOnDashboard = nextUrl.pathname.startsWith('/dashboard');
-
-      if (isOnDashboard) {
-        if (isLoggedIn) return true;
-        return false; // Redirige automáticamente a /login
-      } else if (isLoggedIn && nextUrl.pathname === '/login') {
-        return Response.redirect(new URL('/dashboard', nextUrl));
-      }
-      return true;
+      const isPublicProfile = nextUrl.pathname.startsWith('/gafetdigital/gafetdigital/');
+      const isLoginPage = nextUrl.pathname.startsWith('/gafetdigital/Administrador/Login');
+      if (isPublicProfile || isLoginPage) return true;
+      return isLoggedIn;
     },
   },
-  providers: [
-    Credentials({
-      async authorize(credentials) {
-        // Aquí conectas con tu API externa (ej. Flask) para validar usuario
-        // const res = await fetch("https://tu-api.com/login", { ... })
-        // const user = await res.json()
-
-        if (credentials.email === 'admin@mail.com' && credentials.password === 'password123') {
-          return { id: '1', name: 'Admin', email: 'admin@mail.com' };
-        }
-        return null; // Credenciales inválidas
-      },
-    }),
-  ],
-} satisfies NextAuthConfig;
+  providers: [],
+};
